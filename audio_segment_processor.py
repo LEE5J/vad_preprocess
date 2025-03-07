@@ -348,7 +348,7 @@ class VADProcessor:
 def main():
     """메인 함수"""
     parser = argparse.ArgumentParser(description="Voice Activity Detection 프로세서")
-    parser.add_argument("--input", default="target_resource/*.wav", help="입력 파일 패턴")
+    parser.add_argument("--input", default="sample_noise/*.wav", help="입력 파일 패턴")
     parser.add_argument("--output", default="preprocess", help="출력 디렉토리")
     parser.add_argument("--max_files", type=int, default=None, help="처리할 최대 파일 수")
     parser.add_argument("--seg_duration", type=int, default=30, help="세그먼트 길이 (초)")
