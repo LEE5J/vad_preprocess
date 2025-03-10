@@ -1,4 +1,4 @@
 target_resource/*
-preprocess/*
+preprocess*/*
 *.pyc
 sample*/*
