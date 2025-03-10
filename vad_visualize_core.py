@@ -1,34 +1,244 @@
-# matplotlib 만 사용하며 CPU 인코딩만 사용함
+# vad_common.py
 import os
-import glob
 import numpy as np
 import soundfile as sf
-import torch
-import torch.nn.functional as F
-from tqdm import tqdm
-from sgvad import SGVAD
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
 from matplotlib.animation import FuncAnimation
-import argparse
+import torch
+from sgvad import SGVAD
 import tempfile
-from typing import List, Tuple, Optional, Dict, Any, Union
-import multiprocessing as mp
-import concurrent.futures
-from functools import partial
-import time
+import logging
 import subprocess
+import multiprocessing as mp
+from typing import List, Tuple, Optional, Dict, Any, Union
+
+
+class AudioSegmenter:
+    """오디오 파일을 세그먼트로 분할하는 클래스"""
+    
+    def __init__(self, sample_rate: int):
+        """
+        초기화 함수
+        
+        Args:
+            sample_rate: 오디오 샘플링 주파수 (Hz)
+        """
+        self.sample_rate = sample_rate
+        
+    def split_audio_segments(self, audio: np.ndarray, seg_duration: int = 30, 
+                             merge_threshold: int = 10) -> List[np.ndarray]:
+        """
+        오디오를 지정된 길이의 세그먼트로 분할
+        
+        Args:
+            audio: 오디오 신호 배열
+            seg_duration: 세그먼트 길이 (초)
+            merge_threshold: 병합 임계값 (초)
+            
+        Returns:
+            분할된 오디오 세그먼트 리스트
+        """
+        seg_samples = int(self.sample_rate * seg_duration)
+        merge_samples = int(self.sample_rate * merge_threshold)
+        total_samples = len(audio)
+        
+        if total_samples < seg_samples:
+            return [audio]
+            
+        segments = []
+        start = 0
+        
+        while start < total_samples:
+            end = start + seg_samples
+            if end >= total_samples:
+                # 마지막 세그먼트의 길이가 merge_threshold 미만인 경우, 이전 세그먼트와 병합
+                if (total_samples - start) < merge_samples and segments:
+                    prev_segment = segments.pop()
+                    segments.append(np.concatenate((prev_segment, audio[start:total_samples])))
+                else:
+                    segments.append(audio[start:total_samples])
+                break
+            else:
+                segments.append(audio[start:end])
+                start = end
+                
+        return segments
 
 
 class AudioVisualizer:
-    """오디오 시각화를 담당하는 클래스"""
+    """시각화 관련 통합 클래스 - GPU 및 CPU 모드 모두 지원"""
     
     @staticmethod
-    def create_audio_animation(
+    def create_waveform_plot(
+            audio: np.ndarray, 
+            sample_rate: int, 
+            all_probs: np.ndarray = None, 
+            segment_boundaries: List[Tuple[int, int]] = None, 
+            segment_thresholds_60: List[float] = None,
+            sectors_info: List[Tuple[int, int, int]] = None, 
+            frame_rate_ms: int = 10, 
+            global_threshold_90: float = None,
+            figsize: Tuple[int, int] = (12, 8),
+            dpi: int = 100
+        ) -> Tuple[plt.Figure, Tuple[float, float, float, float]]:
+        """
+        오디오 파형과 VAD 확률값 그래프를 생성하는 함수
+        
+        Args:
+            audio: 오디오 신호 배열
+            sample_rate: 오디오 샘플링 주파수
+            all_probs: VAD 예측 확률값 배열 (선택적)
+            segment_boundaries: 각 세그먼트의 프레임 인덱스 범위 (선택적)
+            segment_thresholds_60: 각 세그먼트의 60번째 퍼센타일 임계값 (선택적)
+            sectors_info: (label, start_frame, end_frame) 형식의 세그먼트 정보 (선택적)
+            frame_rate_ms: 프레임 간 시간 간격 (밀리초)
+            global_threshold_90: 전체 데이터에 대한 90번째 퍼센타일 값 (선택적)
+            figsize: 그림 크기
+            dpi: 해상도
+            
+        Returns:
+            fig: 생성된 matplotlib Figure 객체
+            graph_bbox: 그래프 영역의 바운딩 박스 (x, y, width, height)
+        """
+        if all_probs is not None:
+            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=figsize, gridspec_kw={'height_ratios': [1, 1]})
+        else:
+            fig, ax1 = plt.subplots(1, 1, figsize=figsize)
+        
+        # 첫 번째 서브플롯: 오디오 파형 및 발화 구간
+        time_axis = np.linspace(0, len(audio) / sample_rate, len(audio))
+        ax1.plot(time_axis, audio, color='blue', alpha=0.7, label='Audio waveform')
+        
+        if sectors_info is not None:
+            for segment in sectors_info:
+                label, seg_start_frame, seg_end_frame = segment
+                if label == 1:
+                    seg_start_time = seg_start_frame * frame_rate_ms / 1000
+                    seg_end_time = (seg_end_frame + 1) * frame_rate_ms / 1000
+                    ax1.axvspan(seg_start_time, seg_end_time, color='red', alpha=0.5, label='Speech')
+        
+        ax1.set_xlabel('Time [s]')
+        ax1.set_ylabel('Amplitude')
+        ax1.set_title('Audio Signal with Speech Segments')
+        handles, labels_legend = ax1.get_legend_handles_labels()
+        by_label = dict(zip(labels_legend, handles))
+        ax1.legend(by_label.values(), by_label.keys())
+        
+        # 두 번째 서브플롯: VAD 확률값 및 임계값 표시 (선택적)
+        if all_probs is not None:
+            prob_time_axis = np.linspace(0, len(audio) / sample_rate, len(all_probs))
+            ax2.plot(prob_time_axis, all_probs, color='green', label='VAD Probability')
+            
+            if segment_boundaries is not None and segment_thresholds_60 is not None:
+                for (start_idx, end_idx), threshold in zip(segment_boundaries, segment_thresholds_60):
+                    if start_idx >= len(prob_time_axis) or end_idx > len(prob_time_axis):
+                        continue
+                    start_time = prob_time_axis[start_idx]
+                    end_time = prob_time_axis[end_idx - 1]
+                    ax2.plot([start_time, end_time], [threshold, threshold], 'r--', label='60th percentile')
+            
+            if global_threshold_90 is not None:
+                ax2.axhline(y=global_threshold_90, color='b', linestyle='--', label='90th percentile')
+            
+            if sectors_info is not None:
+                for segment in sectors_info:
+                    label, seg_start_frame, seg_end_frame = segment
+                    if label == 1:
+                        seg_start_time = seg_start_frame * frame_rate_ms / 1000
+                        seg_end_time = (seg_end_frame + 1) * frame_rate_ms / 1000
+                        ax2.axvspan(seg_start_time, seg_end_time, color='red', alpha=0.3)
+            
+            ax2.set_xlabel('Time [s]')
+            ax2.set_ylabel('Probability')
+            ax2.set_title('VAD Probability with Thresholds')
+            handles, labels_legend = ax2.get_legend_handles_labels()
+            by_label = dict(zip(labels_legend, handles))
+            ax2.legend(by_label.values(), by_label.keys())
+        
+        plt.tight_layout()
+        
+        # 그래프 영역의 바운딩 박스 정보 계산
+        fig.canvas.draw()
+        if all_probs is not None:
+            # 두 서브플롯 중 첫 번째 서브플롯의 위치 정보 사용
+            bbox = ax1.get_position()
+        else:
+            bbox = ax1.get_position()
+        
+        # 바운딩 박스 정보 (x, y, width, height)
+        graph_bbox = (bbox.x0, bbox.y0, bbox.width, bbox.height)
+        
+        return fig, graph_bbox
+    
+    @staticmethod
+    def save_static_plot(fig: plt.Figure, save_path: str, dpi: int = 100) -> None:
+        """
+        생성된 그림을 정적 이미지로 저장
+        
+        Args:
+            fig: matplotlib Figure 객체
+            save_path: 저장할 파일 경로
+            dpi: 해상도
+        """
+        fig.savefig(save_path, dpi=dpi)
+        plt.close(fig)
+    
+    @staticmethod
+    def create_audio_visualization_video(
             audio: np.ndarray, 
             sample_rate: int,
             save_path: str,
             all_probs: np.ndarray = None, 
+            segment_boundaries: List[Tuple[int, int]] = None, 
+            segment_thresholds_60: List[float] = None,
+            sectors_info: List[Tuple[int, int, int]] = None, 
+            frame_rate_ms: int = 10, 
+            global_threshold_90: float = None,
+            fps: int = 30,
+            use_gpu: bool = True,
+            dpi: int = 100
+        ) -> str:
+        """
+        오디오 파형과 진행 표시줄이 있는 비디오 생성 - GPU 또는 CPU 인코딩
+        
+        Args:
+            audio: 오디오 신호 배열
+            sample_rate: 오디오 샘플링 주파수
+            save_path: 저장할 비디오 파일 경로
+            all_probs: VAD 예측 확률값 배열 (선택적)
+            segment_boundaries: 각 세그먼트의 프레임 인덱스 범위 (선택적)
+            segment_thresholds_60: 각 세그먼트의 60번째 퍼센타일 임계값 (선택적)
+            sectors_info: (label, start_frame, end_frame) 형식의 세그먼트 정보 (선택적)
+            frame_rate_ms: 프레임 간 시간 간격 (밀리초)
+            global_threshold_90: 전체 데이터에 대한 90번째 퍼센타일 값 (선택적)
+            fps: 비디오 프레임 레이트
+            use_gpu: GPU 가속 사용 여부 
+            dpi: 해상도
+            
+        Returns:
+            save_path: 저장된 비디오 파일 경로 또는 오류 시 None
+        """
+        if use_gpu:
+            return AudioVisualizer._create_video_ffmpeg_gpu(
+                audio, sample_rate, save_path, all_probs, segment_boundaries, 
+                segment_thresholds_60, sectors_info, frame_rate_ms, 
+                global_threshold_90, fps, dpi
+            )
+        else:
+            return AudioVisualizer._create_video_matplotlib_cpu(
+                audio, sample_rate, save_path, all_probs, segment_boundaries,
+                segment_thresholds_60, sectors_info, frame_rate_ms,
+                global_threshold_90, fps, dpi
+            )
+    
+    @staticmethod
+    def _create_video_ffmpeg_gpu(
+            audio: np.ndarray, 
+            sample_rate: int,
+            save_path: str,
+            all_probs: np.ndarray = None, 
+            segment_boundaries: List[Tuple[int, int]] = None, 
+            segment_thresholds_60: List[float] = None,
             sectors_info: List[Tuple[int, int, int]] = None, 
             frame_rate_ms: int = 10, 
             global_threshold_90: float = None,
@@ -36,21 +246,95 @@ class AudioVisualizer:
             dpi: int = 100
         ) -> str:
         """
-        오디오 파형과 진행 표시줄이 있는 애니메이션 비디오 생성
-        
-        Args:
-            audio: 오디오 신호 배열
-            sample_rate: 오디오 샘플링 주파수
-            save_path: 저장할 비디오 파일 경로
-            all_probs: VAD 예측 확률값 배열 (선택적)
-            sectors_info: (label, start_frame, end_frame) 형식의 세그먼트 정보 (선택적)
-            frame_rate_ms: 프레임 간 시간 간격 (밀리초)
-            global_threshold_90: 전체 데이터에 대한 90번째 퍼센타일 값 (선택적)
-            fps: 비디오 프레임 레이트
-            dpi: 해상도
+        FFmpeg와 NVENC를 사용한 비디오 생성 (GPU 가속)
+        """
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # 파형 베이스 이미지 생성 및 그래프 영역 정보 가져오기
+            fig, graph_bbox = AudioVisualizer.create_waveform_plot(
+                audio, sample_rate, all_probs, segment_boundaries, 
+                segment_thresholds_60, sectors_info, frame_rate_ms, 
+                global_threshold_90
+            )
+            waveform_img = os.path.join(temp_dir, 'waveform_base.png')
+            fig.savefig(waveform_img, dpi=dpi)
+            plt.close(fig)
             
-        Returns:
-            save_path: 저장된 비디오 파일 경로 또는 오류 시 None
+            # 오디오 임시 파일 생성
+            audio_temp_path = os.path.join(temp_dir, 'temp_audio.wav')
+            sf.write(audio_temp_path, audio, sample_rate)
+            
+            # 비디오 길이 계산
+            duration = len(audio) / sample_rate
+            
+            # 그래프 영역 정보 추출
+            x0, y0, width, height = graph_bbox
+            
+            # 전체 이미지 크기 가져오기
+            img_width, img_height = fig.get_size_inches() * dpi
+            
+            # 그래프 영역 좌표와 크기를 픽셀 단위로 변환
+            x0_px = int(x0 * img_width)
+            width_px = int(width * img_width)
+            
+            # FFmpeg 명령 구성 - 출력 콘솔 메시지 억제
+            ffmpeg_log_level = "error"  # 에러 메시지만 표시
+            
+            # FFmpeg 명령 구성
+            try:
+                # GPU 가속 사용 시도
+                video_encoder = 'h264_nvenc'
+                
+                # 진행 표시줄을 그리는 필터 복합체 (세로 전체로 확장)
+                filter_complex = (
+                    f"color=red:s=5x{int(img_height)}[line];"
+                    f"[0:v][line]overlay='{x0_px}+t/{duration}*{width_px}:0'[out]"
+                )
+                
+                # FFmpeg 명령 실행
+                subprocess.run([
+                    'ffmpeg',
+                    '-y',
+                    '-loop', '1',
+                    '-i', waveform_img,
+                    '-i', audio_temp_path,
+                    '-filter_complex', filter_complex,
+                    '-map', '[out]',
+                    '-map', '1:a',
+                    '-c:v', video_encoder,
+                    '-preset', 'fast',
+                    '-c:a', 'aac',
+                    '-b:a', '192k',
+                    '-shortest',
+                    '-r', str(fps),
+                    '-pix_fmt', 'yuv420p',
+                    '-threads', str(mp.cpu_count()),
+                    '-loglevel', ffmpeg_log_level,
+                    save_path
+                ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+                
+            except Exception as e:
+                logging.error(f"GPU 가속 실패: {e}. CPU 인코딩으로 전환합니다.")
+                raise e
+                    
+        
+        return save_path
+    
+    @staticmethod
+    def _create_video_matplotlib_cpu(
+            audio: np.ndarray, 
+            sample_rate: int,
+            save_path: str,
+            all_probs: np.ndarray = None, 
+            segment_boundaries: List[Tuple[int, int]] = None,
+            segment_thresholds_60: List[float] = None,
+            sectors_info: List[Tuple[int, int, int]] = None, 
+            frame_rate_ms: int = 10, 
+            global_threshold_90: float = None,
+            fps: int = 30,
+            dpi: int = 100
+        ) -> str:
+        """
+        Matplotlib 애니메이션을 사용한 비디오 생성 (CPU 방식)
         """
         # 임시 디렉토리 생성
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -106,6 +390,15 @@ class AudioVisualizer:
                 if global_threshold_90 is not None:
                     ax2.axhline(y=global_threshold_90, color='b', linestyle='--', label='90th percentile')
                 
+                # 세그먼트 임계값 표시
+                if segment_boundaries is not None and segment_thresholds_60 is not None:
+                    for (start_idx, end_idx), threshold in zip(segment_boundaries, segment_thresholds_60):
+                        if start_idx >= len(prob_time_array) or end_idx > len(prob_time_array):
+                            continue
+                        start_time = prob_time_array[start_idx]
+                        end_time = prob_time_array[end_idx - 1]
+                        ax2.plot([start_time, end_time], [threshold, threshold], 'r--', label='60th percentile')
+                
                 # 발화 구간 표시 (sectors_info가 있는 경우)
                 if sectors_info is not None:
                     for segment in sectors_info:
@@ -155,9 +448,6 @@ class AudioVisualizer:
             
             plt.tight_layout()
             
-            # 비디오 파일 저장
-            print(f"애니메이션 저장 중... ({frames} 프레임)")
-            
             # 인코더 설정
             temp_video = os.path.join(temp_dir, 'temp_video.mp4')
             
@@ -168,13 +458,12 @@ class AudioVisualizer:
                     'fps': fps,
                     'bitrate': 1800,
                     'extra_args': [
-                        '-preset', 'fast',  # 인코딩 속도 vs 품질 (ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow)
+                        '-preset', 'fast',  # 인코딩 속도 vs 품질
                         '-crf', '23',       # 품질 수준 (0-51, 낮을수록 고품질)
                         '-pix_fmt', 'yuv420p'  # 더 넓은 플레이어 호환성
                     ]
                 }
                 
-                print("CPU 인코더로 비디오 인코딩 시작")
                 ani.save(
                     temp_video, 
                     writer='ffmpeg', 
@@ -266,60 +555,65 @@ class AudioVisualizer:
             return save_path
 
 
-class AudioSegmenter:
-    """오디오 파일을 세그먼트로 분할하는 클래스"""
+class VADVisualizer:
+    """VAD 결과를 시각화하는 클래스 - GPU 및 CPU 지원 통합"""
     
-    def __init__(self, sample_rate: int):
+    def visualize_vad_results(
+            self, 
+            audio: np.ndarray, 
+            sample_rate: int, 
+            all_probs: np.ndarray, 
+            segment_boundaries: List[Tuple[int, int]], 
+            segment_thresholds_60: List[float],
+            sectors_info: List[Tuple[int, int, int]], 
+            frame_rate_ms: int, 
+            global_threshold_90: float,
+            output_path: str,
+            video_output: bool = True,
+            fps: int = 30,
+            use_gpu: bool = True
+        ) -> str:
         """
-        초기화 함수
-        
-        Args:
-            sample_rate: 오디오 샘플링 주파수 (Hz)
-        """
-        self.sample_rate = sample_rate
-        
-    def split_audio_segments(self, audio: np.ndarray, seg_duration: int = 30, 
-                             merge_threshold: int = 10) -> List[np.ndarray]:
-        """
-        오디오를 지정된 길이의 세그먼트로 분할
+        VAD 결과 시각화 - 정적 이미지 또는 비디오로 저장
         
         Args:
             audio: 오디오 신호 배열
-            seg_duration: 세그먼트 길이 (초)
-            merge_threshold: 병합 임계값 (초)
+            sample_rate: 오디오 샘플링 주파수
+            all_probs: VAD 예측 확률값 배열
+            segment_boundaries: 각 세그먼트의 프레임 인덱스 범위
+            segment_thresholds_60: 각 세그먼트의 60번째 퍼센타일 임계값 리스트
+            sectors_info: (label, start_frame, end_frame) 형식의 세그먼트 정보 리스트
+            frame_rate_ms: 프레임 간 시간 간격 (밀리초)
+            global_threshold_90: 전체 데이터에 대한 90번째 퍼센타일 값
+            output_path: 출력 파일 경로
+            video_output: True면 비디오, False면 정적 이미지로 저장
+            fps: 비디오 프레임 레이트 (video_output=True인 경우만 사용)
+            use_gpu: GPU 가속 사용 여부 (video_output=True인 경우만 사용)
             
         Returns:
-            분할된 오디오 세그먼트 리스트
+            output_path: 저장된 파일 경로
         """
-        seg_samples = int(self.sample_rate * seg_duration)
-        merge_samples = int(self.sample_rate * merge_threshold)
-        total_samples = len(audio)
-        
-        if total_samples < seg_samples:
-            return [audio]
-            
-        segments = []
-        start = 0
-        
-        while start < total_samples:
-            end = start + seg_samples
-            if end >= total_samples:
-                # 마지막 세그먼트의 길이가 merge_threshold 미만인 경우, 이전 세그먼트와 병합
-                if (total_samples - start) < merge_samples and segments:
-                    prev_segment = segments.pop()
-                    segments.append(np.concatenate((prev_segment, audio[start:total_samples])))
-                else:
-                    segments.append(audio[start:total_samples])
-                break
-            else:
-                segments.append(audio[start:end])
-                start = end
-                
-        return segments
+        if video_output:
+            # 비디오로 저장
+            return AudioVisualizer.create_audio_visualization_video(
+                audio, sample_rate, output_path,
+                all_probs, segment_boundaries, segment_thresholds_60,
+                sectors_info, frame_rate_ms, global_threshold_90,
+                fps, use_gpu
+            )
+        else:
+            # 정적 이미지로 저장
+            fig, _ = AudioVisualizer.create_waveform_plot(
+                audio, sample_rate, all_probs, segment_boundaries,
+                segment_thresholds_60, sectors_info, frame_rate_ms,
+                global_threshold_90
+            )
+            AudioVisualizer.save_static_plot(fig, output_path)
+            return output_path
 
 
-class VADProcessor:
-    """Voice Activity Detection 처리 클래스"""
+class VADProcessorBase:
+    """Voice Activity Detection 처리를 위한 기본 클래스"""
     
     def __init__(self, sgvad_model: SGVAD):
         """
@@ -333,7 +627,7 @@ class VADProcessor:
         self.frame_rate_ms = 10  # 10ms per frame
         self.samples_per_frame = int(self.frame_rate_ms / 1000 * self.sample_rate)
         self.segmenter = AudioSegmenter(self.sample_rate)
-        self.visualizer = AudioVisualizer()
+        self.visualizer = VADVisualizer()
     
     def load_audio(self, file_path: str) -> np.ndarray:
         """
@@ -432,7 +726,7 @@ class VADProcessor:
         return final_labels, global_threshold_90, segments_info
     
     def save_audio_segments(self, segments_info: List[Tuple[int, int, int]], 
-                          audio: np.ndarray, result_dir: str, filename: str) -> None:
+                       audio: np.ndarray, result_dir: str, filename: str) -> None:
         """
         오디오 세그먼트 저장
         
@@ -449,6 +743,7 @@ class VADProcessor:
             seg_end_sample = (seg_end_frame + 1) * self.samples_per_frame
             seg_end_sample = min(seg_end_sample, len(audio))
             
+            # 파일 경로 설정
             if label == 1:
                 out_fpath = os.path.join(result_dir, f"{filename}_{i:02d}_speech.wav")
             else:
@@ -465,13 +760,13 @@ class VADProcessor:
             
             if not np.any(segment_audio):
                 print(f"Silent audio segment: start_idx={seg_start_sample}, end_idx={seg_end_sample}")
-                continue
-            
+                # 여전히 저장하려면 아래 코드 유지
+        
             sf.write(out_fpath, segment_audio, self.sample_rate)
     
     def process_audio_file(self, file_path: str, output_dir: str, seg_duration: int = 30, 
                          merge_threshold: int = 10, smoothing_kernel: int = 21, 
-                         fps: int = 30) -> None:
+                         video_output: bool = True, fps: int = 30, use_gpu: bool = True) -> str:
         """
         오디오 파일 처리 메인 함수
         
@@ -481,11 +776,14 @@ class VADProcessor:
             seg_duration: 세그먼트 길이 (초)
             merge_threshold: 병합 임계값 (초)
             smoothing_kernel: 스무딩 커널 크기
-            fps: 비디오 프레임 레이트
+            video_output: True면 비디오, False면 정적 이미지로 시각화 결과 저장
+            fps: 비디오 프레임 레이트 (video_output=True인 경우만 사용)
+            use_gpu: GPU 가속 사용 여부 (video_output=True인 경우만 사용)
+            
+        Returns:
+            처리 결과 메시지
         """
         try:
-            start_time = time.time()
-            
             # 오디오 로드
             audio = self.load_audio(file_path)
             filename = os.path.basename(file_path)
@@ -499,129 +797,39 @@ class VADProcessor:
                 segments, smoothing_kernel)
             
             # 발화 구간 식별
-            final_labels, global_threshold_90, sectors_info = self.identify_speech_segments(
+            final_labels, global_threshold_90, segments_info = self.identify_speech_segments(
                 candidate_labels, all_probs)
             
             # 결과 디렉토리 생성
             result_dir = os.path.join(output_dir, base_filename)
             os.makedirs(result_dir, exist_ok=True)
             
-            # 오디오 세그먼트 저장
-            self.save_audio_segments(sectors_info, audio, result_dir, filename)
-            
-            # 비디오 애니메이션 생성
-            output_path = os.path.join(result_dir, f"{base_filename}_visualization.mp4")
-            
-            self.visualizer.create_audio_animation(
+            # 시각화 (비디오 또는 정적 이미지)
+            if video_output:
+                output_path = os.path.join(result_dir, f"{base_filename}_visualization.mp4")
+            else:
+                output_path = os.path.join(result_dir, f"{base_filename}_plot.png")
+                
+            self.visualizer.visualize_vad_results(
                 audio, 
                 self.sample_rate, 
-                output_path,
                 all_probs, 
-                sectors_info, 
+                segment_boundaries, 
+                segment_thresholds_60, 
+                segments_info, 
                 self.frame_rate_ms, 
                 global_threshold_90, 
+                output_path,
+                video_output,
                 fps,
-                100
+                use_gpu
             )
             
-            end_time = time.time()
-            print(f"처리 완료. 소요 시간: {end_time - start_time:.2f}초")
-            
+            # 오디오 세그먼트 저장
+            self.save_audio_segments(segments_info, audio, result_dir, filename)
+            return f"완료:{file_path}"
         except Exception as e:
-            print(f"Error processing file {file_path}: {e}")
+            logging.error(f"Error processing file {file_path}: {e}")
             import traceback
-            traceback.print_exc()
-
-
-def process_file_worker(file_path: str, output_dir: str, 
-                        seg_duration: int, merge_threshold: int, smoothing_kernel: int,
-                        fps: int) -> None:
-    """
-    개별 파일 처리 워커 함수 (병렬 처리용)
-    """
-    try:
-        print(f"처리 시작: {file_path}")
-        # 각 프로세스에서 독립적으로 모델 로드
-        sgvad_model = SGVAD.init_from_ckpt()
-        processor = VADProcessor(sgvad_model)
-        processor.process_audio_file(
-            file_path, 
-            output_dir, 
-            seg_duration, 
-            merge_threshold, 
-            smoothing_kernel, 
-            fps
-        )
-        print(f"처리 완료: {file_path}")
-    except Exception as e:
-        print(f"파일 처리 중 오류 발생: {file_path} - {e}")
-        import traceback
-        traceback.print_exc()
-
-
-def main():
-    """메인 함수"""
-    parser = argparse.ArgumentParser(description="병렬 처리 Voice Activity Detection 프로세서")
-    parser.add_argument("--input", default="sample_noise/*.wav", help="입력 파일 패턴")
-    parser.add_argument("--output", default="preprocess", help="출력 디렉토리")
-    parser.add_argument("--max_files", type=int, default=None, help="처리할 최대 파일 수")
-    parser.add_argument("--seg_duration", type=int, default=30, help="세그먼트 길이 (초)")
-    parser.add_argument("--merge_threshold", type=int, default=10, help="병합 임계값 (초)")
-    parser.add_argument("--smoothing_kernel", type=int, default=21, help="스무딩 커널 크기")
-    parser.add_argument("--fps", type=int, default=30, help="비디오 프레임 레이트")
-    parser.add_argument("--processes", type=int, default=None, 
-                      help="병렬 처리에 사용할 프로세스 수 (기본값: CPU 코어 수)")
-    
-    args = parser.parse_args()
-    
-    # 프로세스 수 설정
-    num_processes = args.processes if args.processes is not None else max(1, mp.cpu_count() - 1)
-    
-    # 출력 디렉토리 생성
-    os.makedirs(args.output, exist_ok=True)
-    
-    # 처리할 오디오 파일 목록 가져오기
-    wav_files = list(glob.glob(args.input))
-    if args.max_files:
-        wav_files = wav_files[:args.max_files]
-        
-    if not wav_files:
-        print(f"처리할 .wav 파일이 없습니다: {args.input}")
-        return
-    
-    print(f"총 {len(wav_files)}개 파일을 {num_processes}개 프로세스로 병렬 처리합니다...")
-    print(f"CPU 인코딩 모드로 실행 중...")
-    
-    # 병렬 처리 실행
-    start_time = time.time()
-    
-    with concurrent.futures.ProcessPoolExecutor(max_workers=num_processes) as executor:
-        # 각 작업에 필요한 인자들을 직접 전달 (모델 공유 X)
-        futures = [
-            executor.submit(
-                process_file_worker,
-                file_path=fpath,
-                output_dir=args.output,
-                seg_duration=args.seg_duration,
-                merge_threshold=args.merge_threshold,
-                smoothing_kernel=args.smoothing_kernel,
-                fps=args.fps
-            ) for fpath in wav_files
-        ]
-        
-        # 결과 처리
-        for i, future in enumerate(concurrent.futures.as_completed(futures)):
-            try:
-                future.result()  # 워커에서 발생한 예외 전파
-                print(f"진행 상황: {i+1}/{len(wav_files)} 완료")
-            except Exception as e:
-                print(f"작업 실패: {e}")
-                import traceback
-                print(f"오류 상세: {traceback.format_exc()}")
-    
-    end_time = time.time()
-    print(f"모든 처리 완료. 총 소요 시간: {end_time - start_time:.2f}초")
-
-
-if __name__ == "__main__":
-    main()
+            logging.error(traceback.format_exc())
+            return f"실패:{file_path}:{e}"
