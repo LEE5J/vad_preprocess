@@ -721,7 +721,7 @@ def main():
 if __name__ == "__main__":
     print("GPU 사용 버전입니다. 소비자용 GPU 기준으로 맞춰져 있습니다. 프로페셔날 GPU를 사용시 -w 스레드수 옵션을 통해서 더 높은 성능 사용가능합니다.")
     print("소비자용 그래픽카드를 사용시 https://github.com/keylase/nvidia-patch?tab=readme-ov-file 이 링크를 참고하여 최대 스레드수를 제한해제 하면 모든 성능을 사용가능합니다.")
-    print("소비자용 그래픽카드는 8개의 스레드만 지원하므로 기본적으로 8개의 스레드만 사용합니다.")
+    print("소비자용 그래픽카드는 8개의 스레드만 지원하므로 기본적으로 8개의 스레드만 사용합니다. 24년 1월 이후 드라이버 버전부터 8개의 스레드 지원")
     print("a100과 같은 데이터 센터용 GPU는 nvenc 미지원으로 cpu 버전을 사용해주세요")
     logging.getLogger('nemo').setLevel(logging.ERROR)
     # 로깅 설정 - 치명적인(CRITICAL) 오류만 표시
