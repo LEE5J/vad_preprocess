@@ -72,7 +72,6 @@ python vad_visualize_gpu.py --input "오디오_디렉토리/*.wav" --output "출
 ### GPU 모드 전용 매개변수
 
 - `--static_plot`: 비디오 대신 정적 이미지로 시각화 결과 저장
-- `--no_gpu`: GPU 가속을 비활성화하고 CPU 인코딩 사용
 
 ## CPU와 GPU 모드 비교
 
@@ -204,7 +203,7 @@ python vad_visualize_gpu.py --input "long_files/*.wav" --output "results" --seg_
 
 각 처리된 오디오 파일(`example.wav`)에 대한 출력은 다음과 같습니다:
 ```
-preprocess/
+results/
 └── example/
     ├── example.wav_00_speech.wav      # 첫 번째 발화 세그먼트
     ├── example.wav_01_silence.wav     # 첫 번째 무음 세그먼트
@@ -290,7 +289,6 @@ python vad_visualize_gpu.py --input "audio_directory/*.wav" --output "output_dir
 ### GPU Mode Exclusive Parameters
 
 - `--static_plot`: Save visualization results as static images instead of videos
-- `--no_gpu`: Disable GPU acceleration and use CPU encoding
 
 ## Comparing CPU and GPU Modes
 
@@ -422,7 +420,7 @@ python vad_visualize_gpu.py --input "long_files/*.wav" --output "results" --seg_
 
 For each processed audio file (`example.wav`), the output will be:
 ```
-preprocess/
+results/
 └── example/
     ├── example.wav_00_speech.wav      # First speech segment
     ├── example.wav_01_silence.wav     # First silence segment

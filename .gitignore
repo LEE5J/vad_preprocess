@@ -2,3 +2,5 @@ target_resource/*
 preprocess*/*
 *.pyc
 sample*/*
+target_audio/*
+result_audio/*

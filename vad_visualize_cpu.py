@@ -1,4 +1,4 @@
-# vad_cpu.py
+# vad_visualize_cpu.py
 import os
 import glob
 import logging
@@ -56,8 +56,8 @@ def process_file_worker(file_path: str, output_dir: str,
 def main():
     """메인 함수"""
     parser = argparse.ArgumentParser(description="Voice Activity Detection 프로세서 (CPU 버전)")
-    parser.add_argument("--input", default="sample_noise/*.wav", help="입력 파일 패턴")
-    parser.add_argument("--output", default="preprocess", help="출력 디렉토리")
+    parser.add_argument("--input", default="target_audio/*.wav", help="입력 파일 패턴")
+    parser.add_argument("--output", default="result_audio", help="출력 디렉토리")
     parser.add_argument("--max_files", type=int, default=None, help="처리할 최대 파일 수")
     parser.add_argument("--seg_duration", type=int, default=30, help="세그먼트 길이 (초)")
     parser.add_argument("--merge_threshold", type=int, default=10, help="병합 임계값 (초)")
@@ -70,6 +70,7 @@ def main():
     
     # 프로세스 수 설정
     num_processes = args.workers if args.workers is not None else max(1, mp.cpu_count() - 1)
+    
     
     # 출력 디렉토리 생성
     os.makedirs(args.output, exist_ok=True)
@@ -84,6 +85,7 @@ def main():
         return
     
     total_files = len(wav_files)
+    num_processes = min(num_processes,total_files)
     print(f"총 {total_files}개 파일을 {num_processes}개 프로세스로 병렬 처리합니다...")
     print(f"CPU 인코딩 모드로 실행 중...")
     

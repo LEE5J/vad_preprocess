@@ -1,4 +1,4 @@
-# vad_gpu.py
+# vad_visualize_gpu.py
 import os
 import glob
 import numpy as np
@@ -62,8 +62,8 @@ def main():
     logging.basicConfig(level=logging.ERROR)
     
     parser = argparse.ArgumentParser(description="Voice Activity Detection 프로세서 (GPU 지원)")
-    parser.add_argument("--input", default="sample_noise/*.wav", help="입력 파일 패턴")
-    parser.add_argument("--output", default="preprocess", help="출력 디렉토리")
+    parser.add_argument("--input", default="target_audio/*.wav", help="입력 파일 패턴")
+    parser.add_argument("--output", default="result_audio", help="출력 디렉토리")
     parser.add_argument("--max_files", type=int, default=None, help="처리할 최대 파일 수")
     parser.add_argument("--seg_duration", type=int, default=30, help="세그먼트 길이 (초)")
     parser.add_argument("--merge_threshold", type=int, default=10, help="병합 임계값 (초)")

@@ -1,4 +1,4 @@
-# vad_common.py
+# vad_visualize_common.py
 import os
 import numpy as np
 import soundfile as sf
@@ -83,22 +83,6 @@ class AudioVisualizer:
         ) -> Tuple[plt.Figure, Tuple[float, float, float, float]]:
         """
         오디오 파형과 VAD 확률값 그래프를 생성하는 함수
-        
-        Args:
-            audio: 오디오 신호 배열
-            sample_rate: 오디오 샘플링 주파수
-            all_probs: VAD 예측 확률값 배열 (선택적)
-            segment_boundaries: 각 세그먼트의 프레임 인덱스 범위 (선택적)
-            segment_thresholds_60: 각 세그먼트의 60번째 퍼센타일 임계값 (선택적)
-            sectors_info: (label, start_frame, end_frame) 형식의 세그먼트 정보 (선택적)
-            frame_rate_ms: 프레임 간 시간 간격 (밀리초)
-            global_threshold_90: 전체 데이터에 대한 90번째 퍼센타일 값 (선택적)
-            figsize: 그림 크기
-            dpi: 해상도
-            
-        Returns:
-            fig: 생성된 matplotlib Figure 객체
-            graph_bbox: 그래프 영역의 바운딩 박스 (x, y, width, height)
         """
         if all_probs is not None:
             fig, (ax1, ax2) = plt.subplots(2, 1, figsize=figsize, gridspec_kw={'height_ratios': [1, 1]})
@@ -107,7 +91,12 @@ class AudioVisualizer:
         
         # 첫 번째 서브플롯: 오디오 파형 및 발화 구간
         time_axis = np.linspace(0, len(audio) / sample_rate, len(audio))
+        duration = len(audio) / sample_rate  # 오디오 전체 길이 (초)
+        
         ax1.plot(time_axis, audio, color='blue', alpha=0.7, label='Audio waveform')
+        
+        # 명시적으로 x축 범위 설정 (0부터 오디오 길이까지)
+        ax1.set_xlim(0, duration)
         
         if sectors_info is not None:
             for segment in sectors_info:
@@ -126,8 +115,11 @@ class AudioVisualizer:
         
         # 두 번째 서브플롯: VAD 확률값 및 임계값 표시 (선택적)
         if all_probs is not None:
-            prob_time_axis = np.linspace(0, len(audio) / sample_rate, len(all_probs))
+            prob_time_axis = np.linspace(0, duration, len(all_probs))  # 동일한 시간 범위 사용
             ax2.plot(prob_time_axis, all_probs, color='green', label='VAD Probability')
+            
+            # 명시적으로 x축 범위 설정 (0부터 오디오 길이까지)
+            ax2.set_xlim(0, duration)
             
             if segment_boundaries is not None and segment_thresholds_60 is not None:
                 for (start_idx, end_idx), threshold in zip(segment_boundaries, segment_thresholds_60):
@@ -285,6 +277,7 @@ class AudioVisualizer:
                 video_encoder = 'h264_nvenc'
                 
                 # 진행 표시줄을 그리는 필터 복합체 (세로 전체로 확장)
+                # 정확한 시간 동기화를 위해 명확한 시작점과 너비 사용
                 filter_complex = (
                     f"color=red:s=5x{int(img_height)}[line];"
                     f"[0:v][line]overlay='{x0_px}+t/{duration}*{width_px}:0'[out]"
@@ -316,7 +309,6 @@ class AudioVisualizer:
                 logging.error(f"GPU 가속 실패: {e}. CPU 인코딩으로 전환합니다.")
                 raise e
                     
-        
         return save_path
     
     @staticmethod
@@ -361,6 +353,9 @@ class AudioVisualizer:
             # 오디오 파형 그리기
             ax1.plot(time_array, audio, color='blue', alpha=0.7, label='Audio waveform')
             
+            # 명시적으로 x축 범위 설정 (0부터 오디오 길이까지)
+            ax1.set_xlim(0, duration)
+            
             # 발화 구간 표시 (sectors_info가 있는 경우)
             if sectors_info is not None:
                 for segment in sectors_info:
@@ -377,7 +372,6 @@ class AudioVisualizer:
             handles, labels = ax1.get_legend_handles_labels()
             by_label = dict(zip(labels, handles))
             ax1.legend(by_label.values(), by_label.keys())
-            ax1.set_xlim(0, duration)
             
             # 진행 표시줄 초기화
             progress_line1, = ax1.plot([], [], 'r-', linewidth=2, label='Progress')
@@ -385,6 +379,10 @@ class AudioVisualizer:
             # 확률 그래프 설정 (all_probs가 있는 경우)
             if all_probs is not None:
                 ax2.plot(prob_time_array, all_probs, color='green', label='VAD Probability')
+                
+                # 명시적으로 x축 범위 설정 (0부터 오디오 길이까지)
+                ax2.set_xlim(0, duration)
+                ax2.set_ylim(0, 1)
                 
                 # 임계값 표시
                 if global_threshold_90 is not None:
@@ -415,17 +413,16 @@ class AudioVisualizer:
                 handles, labels = ax2.get_legend_handles_labels()
                 by_label = dict(zip(labels, handles))
                 ax2.legend(by_label.values(), by_label.keys())
-                ax2.set_xlim(0, duration)
-                ax2.set_ylim(0, 1)
                 
                 # 진행 표시줄 초기화
                 progress_line2, = ax2.plot([], [], 'r-', linewidth=2)
             
             # 애니메이션 업데이트 함수
             def update(frame):
+                # 정확한 시간 위치 계산 - 프레임 인덱스를 오디오 시간으로 변환
                 current_time = frame / fps
                 
-                # 진행 표시줄 업데이트
+                # 진행 표시줄 업데이트 - 명확한 시간 위치 사용
                 if current_time <= duration:
                     progress_line1.set_data([current_time, current_time], 
                                         [np.min(audio), np.max(audio)])
@@ -437,6 +434,7 @@ class AudioVisualizer:
                     else:
                         return [progress_line1]
                 else:
+                    # 범위를 벗어나면 마지막 위치에 표시
                     if all_probs is not None:
                         return [progress_line1, progress_line2]
                     else:
