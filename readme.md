@@ -1,6 +1,6 @@
 # 오디오 세그먼트 프로세서
 
-SGVAD(Silero-Google Voice Activity Detection) 모델을 활용하여 오디오 파일에서 발화 부분을 슬라이싱하고 추출하는 도구입니다.
+SGVAD(Stochastic Gates Voice Activity Detection) 모델을 활용하여 오디오 파일에서 발화 부분을 슬라이싱하고 추출하는 도구입니다.
 
 ## 개요
 
@@ -165,17 +165,14 @@ preprocess/
     └── example_plot.png
 ```
 
-## 기여
-
-기여는 환영합니다! Pull Request를 제출해 주세요.
 
 ## 라이선스
 
-이 프로젝트는 MIT 라이선스 하에 제공됩니다 - 자세한 내용은 LICENSE 파일을 참조하세요.
+이 프로젝트는 비상업적용 라이선스 하에 제공됩니다.
 
 # Audio Segment Processor
 
-A tool for slicing and extracting speech segments from audio files using the SGVAD (Silero-Google Voice Activity Detection) model.
+A tool for slicing and extracting speech segments from audio files using the SGVAD (Stochastic Gates Voice Activity Detection) model.
 
 ## Overview
 
@@ -354,4 +351,4 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is non commercial License.

@@ -42,7 +42,7 @@ def process_file_batch(file_batch: List[str], output_dir: str, args) -> List[str
                     smoothing_kernel=args.smoothing_kernel,
                     video_output=not args.static_plot,
                     fps=args.fps,
-                    use_gpu=not args.no_gpu
+                    use_gpu=True
                 )
                 results.append(result)
             except Exception as e:
@@ -71,10 +71,8 @@ def main():
     parser.add_argument("--static_plot", action="store_true", 
                       help="정적 이미지로 시각화 결과 저장 (기본값: 비디오)")
     parser.add_argument("--fps", type=int, default=30, help="비디오 프레임 레이트")
-    parser.add_argument("--no_gpu", action="store_true", help="GPU 가속 비활성화")
     parser.add_argument("--workers", "-w", type=int, default=8, 
                       help="병렬 처리에 사용할 최대 작업자 수 (기본값: 8)")
-    parser.add_argument("--quiet", "-q", action="store_true", help="진행 표시줄 숨기기")
     
     args = parser.parse_args()
     
