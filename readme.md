@@ -1,6 +1,7 @@
 # 오디오 세그먼트 프로세서
 
 SGVAD(Stochastic Gates Voice Activity Detection) 모델을 활용하여 오디오 파일에서 발화 부분을 슬라이싱하고 추출하는 도구입니다.
+sgvad: arXiv:2210.16022
 
 ## 개요
 
