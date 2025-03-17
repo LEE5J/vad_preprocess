@@ -7,9 +7,8 @@ import multiprocessing as mp
 import concurrent.futures
 import time
 from sgvad import SGVAD
-
-# 공통 모듈 임포트
 from vad_visualize_core import VADProcessorBase
+
 
 
 def process_file_worker(file_path: str, output_dir: str, 
@@ -62,7 +61,7 @@ def main():
     parser.add_argument("--seg_duration", type=int, default=30, help="세그먼트 길이 (초)")
     parser.add_argument("--merge_threshold", type=int, default=10, help="병합 임계값 (초)")
     parser.add_argument("--smoothing_kernel", type=int, default=21, help="스무딩 커널 크기")
-    parser.add_argument("--fps", type=int, default=30, help="비디오 프레임 레이트")
+    parser.add_argument("--fps", type=int, default=10, help="비디오 프레임 레이트")
     parser.add_argument("--workers", "-w", type=int, default=None, 
                       help="병렬 처리에 사용할 프로세스 수 (기본값: CPU 코어 수)")
     

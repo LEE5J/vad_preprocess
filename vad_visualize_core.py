@@ -66,7 +66,6 @@ class AudioSegmenter:
 
 
 class AudioVisualizer:
-    """시각화 관련 통합 클래스 - GPU 및 CPU 모드 모두 지원"""
     
     @staticmethod
     def create_waveform_plot(
@@ -77,7 +76,7 @@ class AudioVisualizer:
             segment_thresholds_60: List[float] = None,
             sectors_info: List[Tuple[int, int, int]] = None, 
             frame_rate_ms: int = 10, 
-            global_threshold_90: float = None,
+            global_threshold_A: float = None,
             figsize: Tuple[int, int] = (12, 8),
             dpi: int = 100
         ) -> Tuple[plt.Figure, Tuple[float, float, float, float]]:
@@ -129,8 +128,8 @@ class AudioVisualizer:
                     end_time = prob_time_axis[end_idx - 1]
                     ax2.plot([start_time, end_time], [threshold, threshold], 'r--', label='60th percentile')
             
-            if global_threshold_90 is not None:
-                ax2.axhline(y=global_threshold_90, color='b', linestyle='--', label='90th percentile')
+            if global_threshold_A is not None:
+                ax2.axhline(y=global_threshold_A, color='b', linestyle='--', label=f'90th percentile')
             
             if sectors_info is not None:
                 for segment in sectors_info:
@@ -185,7 +184,7 @@ class AudioVisualizer:
             segment_thresholds_60: List[float] = None,
             sectors_info: List[Tuple[int, int, int]] = None, 
             frame_rate_ms: int = 10, 
-            global_threshold_90: float = None,
+            global_threshold_A: float = None,
             fps: int = 30,
             use_gpu: bool = True,
             dpi: int = 100
@@ -202,7 +201,7 @@ class AudioVisualizer:
             segment_thresholds_60: 각 세그먼트의 60번째 퍼센타일 임계값 (선택적)
             sectors_info: (label, start_frame, end_frame) 형식의 세그먼트 정보 (선택적)
             frame_rate_ms: 프레임 간 시간 간격 (밀리초)
-            global_threshold_90: 전체 데이터에 대한 90번째 퍼센타일 값 (선택적)
+            global_threshold_A: 전체 데이터에 대한 90번째 퍼센타일 값 (선택적)
             fps: 비디오 프레임 레이트
             use_gpu: GPU 가속 사용 여부 
             dpi: 해상도
@@ -214,13 +213,13 @@ class AudioVisualizer:
             return AudioVisualizer._create_video_ffmpeg_gpu(
                 audio, sample_rate, save_path, all_probs, segment_boundaries, 
                 segment_thresholds_60, sectors_info, frame_rate_ms, 
-                global_threshold_90, fps, dpi
+                global_threshold_A, fps, dpi
             )
         else:
             return AudioVisualizer._create_video_matplotlib_cpu(
                 audio, sample_rate, save_path, all_probs, segment_boundaries,
                 segment_thresholds_60, sectors_info, frame_rate_ms,
-                global_threshold_90, fps, dpi
+                global_threshold_A, fps, dpi
             )
     
     @staticmethod
@@ -233,7 +232,7 @@ class AudioVisualizer:
             segment_thresholds_60: List[float] = None,
             sectors_info: List[Tuple[int, int, int]] = None, 
             frame_rate_ms: int = 10, 
-            global_threshold_90: float = None,
+            global_threshold_A: float = None,
             fps: int = 30,
             dpi: int = 100
         ) -> str:
@@ -245,7 +244,7 @@ class AudioVisualizer:
             fig, graph_bbox = AudioVisualizer.create_waveform_plot(
                 audio, sample_rate, all_probs, segment_boundaries, 
                 segment_thresholds_60, sectors_info, frame_rate_ms, 
-                global_threshold_90
+                global_threshold_A
             )
             waveform_img = os.path.join(temp_dir, 'waveform_base.png')
             fig.savefig(waveform_img, dpi=dpi)
@@ -321,7 +320,7 @@ class AudioVisualizer:
             segment_thresholds_60: List[float] = None,
             sectors_info: List[Tuple[int, int, int]] = None, 
             frame_rate_ms: int = 10, 
-            global_threshold_90: float = None,
+            global_threshold_A: float = None,
             fps: int = 30,
             dpi: int = 100
         ) -> str:
@@ -385,8 +384,8 @@ class AudioVisualizer:
                 ax2.set_ylim(0, 1)
                 
                 # 임계값 표시
-                if global_threshold_90 is not None:
-                    ax2.axhline(y=global_threshold_90, color='b', linestyle='--', label='90th percentile')
+                if global_threshold_A is not None:
+                    ax2.axhline(y=global_threshold_A, color='b', linestyle='--', label='90th percentile')
                 
                 # 세그먼트 임계값 표시
                 if segment_boundaries is not None and segment_thresholds_60 is not None:
@@ -565,7 +564,7 @@ class VADVisualizer:
             segment_thresholds_60: List[float],
             sectors_info: List[Tuple[int, int, int]], 
             frame_rate_ms: int, 
-            global_threshold_90: float,
+            global_threshold_A: float,
             output_path: str,
             video_output: bool = True,
             fps: int = 30,
@@ -582,7 +581,7 @@ class VADVisualizer:
             segment_thresholds_60: 각 세그먼트의 60번째 퍼센타일 임계값 리스트
             sectors_info: (label, start_frame, end_frame) 형식의 세그먼트 정보 리스트
             frame_rate_ms: 프레임 간 시간 간격 (밀리초)
-            global_threshold_90: 전체 데이터에 대한 90번째 퍼센타일 값
+            global_threshold_A: 전체 데이터에 대한 90번째 퍼센타일 값
             output_path: 출력 파일 경로
             video_output: True면 비디오, False면 정적 이미지로 저장
             fps: 비디오 프레임 레이트 (video_output=True인 경우만 사용)
@@ -596,7 +595,7 @@ class VADVisualizer:
             return AudioVisualizer.create_audio_visualization_video(
                 audio, sample_rate, output_path,
                 all_probs, segment_boundaries, segment_thresholds_60,
-                sectors_info, frame_rate_ms, global_threshold_90,
+                sectors_info, frame_rate_ms, global_threshold_A,
                 fps, use_gpu
             )
         else:
@@ -604,7 +603,7 @@ class VADVisualizer:
             fig, _ = AudioVisualizer.create_waveform_plot(
                 audio, sample_rate, all_probs, segment_boundaries,
                 segment_thresholds_60, sectors_info, frame_rate_ms,
-                global_threshold_90
+                global_threshold_A
             )
             AudioVisualizer.save_static_plot(fig, output_path)
             return output_path
@@ -688,10 +687,10 @@ class VADProcessorBase:
             
         Returns:
             final_labels: 최종 결정된 발화 라벨
-            global_threshold_90: 전체 데이터에 대한 90번째 퍼센타일 값
+            global_threshold_A: 전체 데이터에 대한 A번째 퍼센타일 값
             segments_info: (label, start_frame, end_frame) 형식의 세그먼트 정보 리스트
         """
-        global_threshold_90 = np.percentile(all_probs, 90)
+        global_threshold_A = np.percentile(all_probs, 80)
         final_labels = np.zeros_like(candidate_labels)
         
         i = 0
@@ -702,7 +701,7 @@ class VADProcessorBase:
                     i += 1
                 end_frame_idx = i - 1
                 candidate_segment = all_probs[start_frame_idx:end_frame_idx+1]
-                if np.any(candidate_segment >= global_threshold_90):
+                if np.any(candidate_segment >= global_threshold_A):
                     final_labels[start_frame_idx:end_frame_idx+1] = 1
             else:
                 i += 1
@@ -721,7 +720,7 @@ class VADProcessorBase:
                 current_label = label
         segments_info.append((current_label, start_frame_idx, len(final_labels) - 1))
         
-        return final_labels, global_threshold_90, segments_info
+        return final_labels, global_threshold_A, segments_info
     
     def save_audio_segments(self, segments_info: List[Tuple[int, int, int]], 
                        audio: np.ndarray, result_dir: str, filename: str) -> None:
@@ -762,9 +761,8 @@ class VADProcessorBase:
         
             sf.write(out_fpath, segment_audio, self.sample_rate)
     
-    def process_audio_file(self, file_path: str, output_dir: str, seg_duration: int = 30, 
-                         merge_threshold: int = 10, smoothing_kernel: int = 21, 
-                         video_output: bool = True, fps: int = 30, use_gpu: bool = True) -> str:
+    def process_audio_file(self, file_path: str, output_dir: str, smoothing_kernel: int,seg_duration: int = 30, 
+                         merge_threshold: int = 10, video_output: bool = True, fps: int = 30, use_gpu: bool = True) -> str:
         """
         오디오 파일 처리 메인 함수
         
@@ -795,7 +793,7 @@ class VADProcessorBase:
                 segments, smoothing_kernel)
             
             # 발화 구간 식별
-            final_labels, global_threshold_90, segments_info = self.identify_speech_segments(
+            final_labels, global_threshold_A, segments_info = self.identify_speech_segments(
                 candidate_labels, all_probs)
             
             # 결과 디렉토리 생성
@@ -816,7 +814,7 @@ class VADProcessorBase:
                 segment_thresholds_60, 
                 segments_info, 
                 self.frame_rate_ms, 
-                global_threshold_90, 
+                global_threshold_A, 
                 output_path,
                 video_output,
                 fps,

@@ -67,7 +67,7 @@ def main():
     parser.add_argument("--max_files", type=int, default=None, help="처리할 최대 파일 수")
     parser.add_argument("--seg_duration", type=int, default=30, help="세그먼트 길이 (초)")
     parser.add_argument("--merge_threshold", type=int, default=10, help="병합 임계값 (초)")
-    parser.add_argument("--smoothing_kernel", type=int, default=21, help="스무딩 커널 크기")
+    parser.add_argument("--smoothing_kernel", type=int, default=15, help="스무딩 커널 크기")
     parser.add_argument("--static_plot", action="store_true", 
                       help="정적 이미지로 시각화 결과 저장 (기본값: 비디오)")
     parser.add_argument("--fps", type=int, default=30, help="비디오 프레임 레이트")
