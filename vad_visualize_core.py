@@ -12,7 +12,7 @@ import subprocess
 import multiprocessing as mp
 from typing import List, Tuple, Optional, Dict, Any, Union
 
-
+print("그래프 세로축의 범위를 0부터 1로 고정할것 확률 값")
 class AudioSegmenter:
     """오디오 파일을 세그먼트로 분할하는 클래스"""
     

@@ -28,7 +28,7 @@ def process_file_batch(file_batch: List[str], output_dir: str, args) -> List[str
     """
     try:
         # 모델을 한 번만 로드
-        sgvad_model = SGVAD.init_from_ckpt()
+        sgvad_model = SGVAD()
         processor = VADProcessorBase(sgvad_model)
         
         results = []

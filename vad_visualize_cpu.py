@@ -31,7 +31,7 @@ def process_file_worker(file_path: str, output_dir: str,
     try:
         # print(f"처리 시작: {file_path}")
         # 각 프로세스에서 독립적으로 모델 로드
-        sgvad_model = SGVAD.init_from_ckpt()
+        sgvad_model = SGVAD()
         processor = VADProcessorBase(sgvad_model)
         result = processor.process_audio_file(
             file_path, 

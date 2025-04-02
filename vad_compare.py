@@ -9,35 +9,12 @@ import torch
 import whisper
 import traceback
 from typing import List, Dict, Tuple, Any
-from collections import defaultdict
+
+from vad_compare_util import ErrorCollector
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 
-# 에러 메시지 수집용 클래스
-class ErrorCollector:
-    def __init__(self):
-        self.errors = defaultdict(list)
-    
-    def add(self, category, message):
-        self.errors[category].append(message)
-    
-    def print_all(self):
-        if not self.errors:
-            return
-        
-        print("\n===== 수집된 에러 메시지 =====")
-        for category, messages in self.errors.items():
-            print(f"\n{category} 관련 에러 ({len(messages)}개):")
-            for i, msg in enumerate(messages[:20], 1):  # 카테고리별 최대 20개만 출력
-                print(f"{i}. {msg}")
-            
-            if len(messages) > 20:
-                print(f"... 외 {len(messages) - 20}개 더 있음")
-        print("==============================\n")
-    
-    def clear(self):
-        self.errors.clear()
 
 
 # Whisper 기반 VAD 모델 (배치 처리 지원)
@@ -81,7 +58,7 @@ class WhisperVAD:
                         beam_size=5,
                         patience=2,
                         temperature=0.1,
-                        language="ko"
+                        language="en"
                     )
                     
                     segments = []
@@ -150,7 +127,7 @@ def merge_overlapping_segments(segments, max_gap=0.3):
     
     return merged_segments
 
-# 개선된 TextGrid 생성 함수
+
 def create_textgrid(file_path, segments, output_path, error_collector):
     """발화 세그먼트로부터 TextGrid 파일을 생성합니다."""
     try:
@@ -435,7 +412,7 @@ def evaluate_vad(
     all_files = []
     
     # 각 하위 폴더에서 wav 파일 찾기
-    for subfolder in tqdm(subfolders, desc="폴더 스캔 중"):
+    for subfolder in subfolders:
         try:
             subfolder_path = os.path.join(input_dir, subfolder)
             wav_files = glob.glob(os.path.join(subfolder_path, "*.wav"))
@@ -527,7 +504,7 @@ if __name__ == "__main__":
         output_dir="result_tg",
         label_dir="label_tg",
         model_name="large-v2",
-        sample_limit=3000,  # 각 폴더별로 3000개 파일로 제한
-        batch_size=4096,      # 배치 크기
+        sample_limit=1000,  # 각 폴더별로 3000개 파일로 제한
+        batch_size=8,      # 배치 크기
         debug_mode=False    # 디버깅 정보 출력
     )
