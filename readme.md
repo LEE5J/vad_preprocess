@@ -166,6 +166,72 @@ preprocess/
     └── example_plot.png
 ```
 
+## 비디오 시각화 도구
+
+오디오 세그먼트 프로세서 외에도, 이 프로젝트는 오디오와 시각화를 동기화된 비디오로 변환하는 도구를 제공합니다. 이를 통해 분석 결과를 보다 직관적으로 검토할 수 있습니다.
+
+### 주요 기능
+
+- **동기화된 진행 표시**: 오디오 재생에 맞춰 시각화 이미지 위에 진행 선을 표시
+- **VAD 시각화**: 오디오 내의 음성 활동 감지 결과를 실시간으로 표시
+- **NVIDIA 하드웨어 가속**: 사용 가능한 경우 NVIDIA 하드웨어 인코딩 활용
+- **배치 처리**: 여러 오디오-시각화 쌍을 한 번에 처리
+- **좌표 로그 지원**: 로그 파일에서 표시 좌표를 자동으로 로드
+
+### 사용 방법
+
+비디오 생성 도구를 실행하는 기본 명령:
+
+```bash
+python create_video_with_progress.py --base-dir "/your/project/directory"
+```
+
+### 전체 명령줄 옵션
+
+```bash
+python create_video_with_progress.py \
+  --base-dir "/your/project/directory" \
+  --log-file "coordinates.log" \
+  --fps 30 \
+  --use-vad \
+  --vad-threshold 0.5
+```
+
+### 매개변수 설명
+
+- `--base-dir`: 시각화 이미지와 오디오 파일이 포함된 기본 디렉토리
+- `--log-file`: 표시 좌표가 포함된 로그 파일 경로 (선택사항)
+- `--fps`: 출력 비디오의 초당 프레임 수 (기본값: 30)
+- `--use-vad`: 시각화에 음성 활동 감지를 표시하려면 이 플래그 추가
+- `--vad-threshold`: VAD 활동 감지를 위한 임계값 (기본값: 0.5)
+
+### 디렉토리 구조
+
+비디오 생성 도구는 다음과 같은 디렉토리 구조를 기대합니다:
+
+```
+base_directory/
+├── target_audio/             # 오디오 파일이 위치하는 디렉토리
+│   ├── audio1.wav
+│   └── audio2.wav
+├── result_compare_plt/       # 시각화 이미지가 위치하는 디렉토리
+│   ├── audio1_comparison.png
+│   └── audio2_comparison.png
+└── result_videos/            # 생성된 비디오가 저장되는 디렉토리 (자동 생성)
+    ├── audio1_video.mp4
+    └── audio2_video.mp4
+```
+
+### 로그 파일 형식
+
+좌표 로그 파일은 다음 형식을 사용해야 합니다:
+
+```
+File: audio1, Start: 100, End: 1800, Duration: 5.5s
+File: audio2, Start: 120, End: 1750, Duration: 4.2s
+```
+
+각 줄에는 파일 이름, 시작 좌표(픽셀), 끝 좌표(픽셀) 및 오디오 지속 시간(초)이 포함되어야 합니다.
 
 ## 라이선스
 
@@ -345,6 +411,73 @@ preprocess/
     ├── example.wav_02_speech.wav
     └── example_plot.png
 ```
+
+## Video Visualization Tool
+
+In addition to the audio segment processor, this project provides a tool to convert audio and visualizations into synchronized videos. This allows for a more intuitive review of the analysis results.
+
+### Key Features
+
+- **Synchronized Progress Indicator**: Displays a progress line over the visualization image in sync with audio playback
+- **VAD Visualization**: Shows voice activity detection results in real-time within the audio
+- **NVIDIA Hardware Acceleration**: Utilizes NVIDIA hardware encoding if available
+- **Batch Processing**: Process multiple audio-visualization pairs in one operation
+- **Coordinate Log Support**: Automatically loads display coordinates from a log file
+
+### Usage
+
+The basic command to run the video creation tool:
+
+```bash
+python create_video_with_progress.py --base-dir "/your/project/directory"
+```
+
+### Full Command-Line Options
+
+```bash
+python create_video_with_progress.py \
+  --base-dir "/your/project/directory" \
+  --log-file "coordinates.log" \
+  --fps 30 \
+  --use-vad \
+  --vad-threshold 0.5
+```
+
+### Parameter Details
+
+- `--base-dir`: Base directory containing visualization images and audio files
+- `--log-file`: Path to the log file containing display coordinates (optional)
+- `--fps`: Frames per second for the output video (default: 30)
+- `--use-vad`: Add this flag to display voice activity detection in the visualization
+- `--vad-threshold`: Threshold for VAD activity detection (default: 0.5)
+
+### Directory Structure
+
+The video creation tool expects the following directory structure:
+
+```
+base_directory/
+├── target_audio/             # Directory containing audio files
+│   ├── audio1.wav
+│   └── audio2.wav
+├── result_compare_plt/       # Directory containing visualization images
+│   ├── audio1_comparison.png
+│   └── audio2_comparison.png
+└── result_videos/            # Directory where generated videos will be saved (auto-created)
+    ├── audio1_video.mp4
+    └── audio2_video.mp4
+```
+
+### Log File Format
+
+The coordinate log file should use the following format:
+
+```
+File: audio1, Start: 100, End: 1800, Duration: 5.5s
+File: audio2, Start: 120, End: 1750, Duration: 4.2s
+```
+
+Each line should include the file name, start coordinate (pixels), end coordinate (pixels), and audio duration (seconds).
 
 ## Contributing
 
