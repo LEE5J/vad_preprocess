@@ -5,7 +5,7 @@ ces*/*
 target_audio*/*
 result_audio/*
 hyundae*.zip
-noise_mixed_audio
+noise_mixed_audio*
 label_tg
 target_wav
 sample_noise

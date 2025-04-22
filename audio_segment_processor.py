@@ -256,7 +256,7 @@ def main():
     """메인 함수"""
     parser = argparse.ArgumentParser(description="Voice Activity Detection 프로세서")
     parser.add_argument("--input", default="sample_noise/*.wav", help="입력 파일 패턴")
-    parser.add_argument("--output", default="preprocess", help="출력 디렉토리")
+    parser.add_argument("--output", default="segmented_wav", help="출력 디렉토리")
     parser.add_argument("--max_files", type=int, default=None, help="처리할 최대 파일 수")
     parser.add_argument("--smoothing_kernel", type=int, default=21, help="스무딩 커널 크기")
     parser.add_argument("--no_plot", action="store_true", help="시각화 결과 저장 비활성화")

@@ -83,7 +83,7 @@ class SGVAD:
 
             print(f"체크포인트 로드 중: {self.cfg.ckpt}")
             # 중요: 체크포인트를 먼저 CPU로 로드 (GPU 메모리 문제 및 이식성)
-            ckpt = torch.load(self.cfg.ckpt, map_location='cpu')
+            ckpt = torch.load(self.cfg.ckpt, map_location='cpu') # sgvad.pth 에서 로드 
 
             # 체크포인트 내용 확인
             if 'preprocessor' not in ckpt:
@@ -294,8 +294,13 @@ if __name__ == "__main__":
         for fpath, scores in zip(audio_files, all_scores):
             if scores:
                 processed_count += 1
-                # (결과 분석 로직은 동일)
-                # ... (기존과 동일) ...
+                avg_score = np.mean(scores)
+                speech_frames = np.sum(np.array(scores) > vad_threshold)
+                total_frames = len(scores)
+                speech_ratio = speech_frames / total_frames if total_frames > 0 else 0
+                is_speech_present = speech_ratio > 0.1
+                label = "음성 가능성 높음" if is_speech_present else "비음성 가능성 높음"
+                
             else:
                 failed_count += 1
                 print(f"- {os.path.basename(fpath)}: 처리 실패 또는 점수 없음")
