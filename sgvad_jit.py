@@ -102,7 +102,7 @@ def run_preprocessor(fpath: str):
 # 전처리 및 TorchScript 추적 수행
 # -----------------------------
 # 예제용 오디오 파일 경로 (적절히 변경)
-dummy_audio_path = "ces_audio/sample_1.wav"
+dummy_audio_path = "sample_1.wav"
 if not os.path.exists(dummy_audio_path):
     raise FileNotFoundError(f"오디오 파일을 찾을 수 없습니다: {dummy_audio_path}")
 

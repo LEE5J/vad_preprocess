@@ -82,7 +82,7 @@ def run_preprocessor(fpath: str):
 # 테스트 수행: 전처리 및 두 모델 예측
 # -----------------------------
 # 테스트용 오디오 파일 경로 (필요에 맞게 변경)
-test_audio_path = "ces_audio/sample_1.wav"
+test_audio_path = "sample_1.wav"
 if not os.path.exists(test_audio_path):
     raise FileNotFoundError(f"테스트 오디오 파일을 찾을 수 없습니다: {test_audio_path}")
 
