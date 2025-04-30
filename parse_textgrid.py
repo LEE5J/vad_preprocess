@@ -102,7 +102,7 @@ def parse_textgrid_to_labels(textgrid_path, frame_shift_sec=0.01):
 
 if __name__ == "__main__":
     # 테스트용 코드
-    test_path = "label_tg/MSP-PODCAST_0002_0033.TextGrid"
+    test_path = "label_tg/sample_1.TextGrid"
     segments, duration = parse_textgrid_to_labels(test_path)
     print(f"발화 구간: {segments}")
     print(f"전체 길이: {duration}")

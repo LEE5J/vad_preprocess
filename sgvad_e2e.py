@@ -106,7 +106,7 @@ def get_segmented_audio(audio, label,audio_path,smooth=15):
 
 
 if __name__ == "__main__":
-    audio_path = "sample_1.wav"
+    audio_path = "target_wav/비발화_발화소음.wav"
     sample_rate = 16000
     audio, sr = librosa.load(audio_path, sr=sample_rate)
     wave_tensor = torch.tensor(audio, dtype=torch.float32).unsqueeze(0).to(device)

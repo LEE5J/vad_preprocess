@@ -17,7 +17,7 @@ MAX_FILES_PER_FOLDER = 3000  # 각 하위 폴더에서 사용할 최대 파일 �
 RANDOM_SEED = 42  # 파일 샘플링을 위한 랜덤 시드 고정
 
 # VAD 결과 처리 파라미터
-VAD_THRESHOLD_LOW = 0.08  # 발화 후보군 선정을 위한 낮은 임계값
+VAD_THRESHOLD_LOW = 0.10  # 발화 후보군 선정을 위한 낮은 임계값
 VAD_THRESHOLD_HIGH = 0.15 # 실제 발화 구간 확정을 위한 높은 임계값
 EVALUATION_FRAME_SHIFT_SEC = 0.01
 
@@ -99,7 +99,7 @@ def main():
     sgvad_model = None
     sgvad_native_frame_shift_sec = 0.01 # 기본값, cfg 파일에서 읽어옴
     try:
-        sgvad_model = SGVAD(cfg_path=SGVAD_CFG_PATH)
+        sgvad_model = SGVAD()
         # 모델의 네이티브 프레임 시프트 확인 (VAD 점수 처리에 사용)
         if hasattr(sgvad_model.cfg, 'preprocessor') and hasattr(sgvad_model.cfg.preprocessor, 'window_stride'):
             sgvad_native_frame_shift_sec = sgvad_model.cfg.preprocessor.window_stride
@@ -126,7 +126,7 @@ def main():
     subfolder_files = {} # 폴더명 -> 파일 경로 리스트 맵
     try:
         for subfolder_path in glob.glob(os.path.join(NOISE_MIXED_AUDIO_DIR, '*/')):
-            if not os.path.isdir(subfolder_path): continue # 디렉토리가 아니면 건너<0xEB><0x9B><0x84>
+            if not os.path.isdir(subfolder_path): continue # 디렉토리가 아니면 건너띔
             subfolder_name = os.path.basename(os.path.normpath(subfolder_path))
             wav_files = glob.glob(os.path.join(subfolder_path, '*.wav'))
             if not wav_files:

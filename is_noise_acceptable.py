@@ -1,5 +1,6 @@
 import librosa
 import numpy as np
+import math
 
 def score_wav_file(file_path):
     # WAV 파일을 16kHz 샘플레이트로 로드
@@ -27,8 +28,9 @@ def score_wav_file(file_path):
         ratio = percentile_95 / 1e-10
     
     
-    score = ratio*4 - 60
-    score = max(0, min(100, score))  # 0~100 사이로 클리핑
+    snr_acc = max(1,min(ratio-20, 40))
+
+    score = math.log(snr_acc,40)*100
     
     return score
 
